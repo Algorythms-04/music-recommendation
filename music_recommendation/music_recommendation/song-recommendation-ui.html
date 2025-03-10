@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Song Recommendation System</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #1db954;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .search-container {
+            margin-bottom: 20px;
+        }
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        input[type="text"] {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #1db954;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 15px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #1a9347;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .search-results {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        .result-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .result-item:hover {
+            background-color: #f5f5f5;
+        }
+        .result-item:last-child {
+            border-bottom: none;
+        }
+        .recommendations {
+            margin-top: 30px;
+        }
+        .recommendations h2 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        .song-card {
+            background-color: #f9f9f9;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        .song-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .song-artist {
+            color: #666;
+            font-size: 14px;
+        }
+        .options {
+            margin-bottom: 20px;
+        }
+        .options label {
+            display: block;
+            margin-bottom: 10px;
+        }
+        select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 100%;
+            font-size: 16px;
+        }
+        .or-divider {
+            text-align: center;
+            margin: 20px 0;
+            color: #666;
+        }
+        .loading {
+            text-align: center;
+            margin: 20px 0;
+            display: none;
+        }
+        .error-message {
+            color: #e74c3c;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+            background-color: #fde8e8;
+            border: 1px solid #f8c9c9;
+            display: none;
+        }
+        .cors-message {
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .cors-message code {
+            background-color: #f8f9fa;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Song Recommendation System</h1>
+        
+        <div id="cors-message" class="cors-message">
+            <strong>CORS Issue Detected!</strong> 
+            <p>To fix this, add the following code to your FastAPI app:</p>
+            <pre><code>from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)</code></pre>
+            <p>Then restart your server and refresh this page.</p>
+        </div>
+        
+        <div class="options">
+            <label for="recommendation-model">
+                Select Recommendation Model:
+                <select id="recommendation-model">
+                    <option value="hybrid">Hybrid Recommendations (Content-Based)</option>
+                    <option value="content">Content-Based Only</option>
+                    <option value="collaborative">Collaborative Filtering</option>
+                </select>
+            </label>
+            
+            <label for="api-url">
+                API Base URL:
+                <input type="text" id="api-url" value="http://localhost:8000" style="width: 100%; box-sizing: border-box;">
+            </label>
+        </div>
+        
+        <div class="search-container">
+            <h2>Search for a Song</h2>
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="Enter a song name...">
+                <button id="search-button">Search</button>
+            </div>
+            <div class="search-results" id="search-results"></div>
+        </div>
+        
+        <div class="or-divider">- OR -</div>
+        
+        <div class="search-container">
+            <h2>Enter Track ID Directly</h2>
+            <div class="search-box">
+                <input type="text" id="track-id-input" placeholder="Enter a track ID...">
+                <button id="get-recommendations-button">Get Recommendations</button>
+            </div>
+        </div>
+        
+        <div class="loading" id="loading">
+            Looking for recommendations...
+        </div>
+        
+        <div class="error-message" id="error-message"></div>
+        
+        <div class="recommendations" id="recommendations">
+            <h2>Recommended Songs</h2>
+            <div id="recommendation-results"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elements
+            const searchInput = document.getElementById('search-input');
+            const searchButton = document.getElementById('search-button');
+            const searchResults = document.getElementById('search-results');
+            const trackIdInput = document.getElementById('track-id-input');
+            const getRecommendationsButton = document.getElementById('get-recommendations-button');
+            const recommendationResults = document.getElementById('recommendation-results');
+            const recommendationModel = document.getElementById('recommendation-model');
+            const loading = document.getElementById('loading');
+            const errorMessage = document.getElementById('error-message');
+            const apiUrlInput = document.getElementById('api-url');
+            const corsMessage = document.getElementById('cors-message');
+            
+            // Get API base URL from input
+            function getApiBaseUrl() {
+                return apiUrlInput.value.trim();
+            }
+            
+            // Check API health on load
+            checkApiHealth();
+            
+            // Search button click handler
+            searchButton.addEventListener('click', function() {
+                const query = searchInput.value.trim();
+                if (query) {
+                    searchSongs(query);
+                }
+            });
+            
+            // Search input enter key handler
+            searchInput.addEventListener('keyup', function(event) {
+                if (event.key === 'Enter') {
+                    const query = searchInput.value.trim();
+                    if (query) {
+                        searchSongs(query);
+                    }
+                }
+            });
+            
+            // Get recommendations button click handler
+            getRecommendationsButton.addEventListener('click', function() {
+                const trackId = trackIdInput.value.trim();
+                if (trackId) {
+                    getRecommendations(trackId);
+                }
+            });
+            
+            // Track ID input enter key handler
+            trackIdInput.addEventListener('keyup', function(event) {
+                if (event.key === 'Enter') {
+                    const trackId = trackIdInput.value.trim();
+                    if (trackId) {
+                        getRecommendations(trackId);
+                    }
+                }
+            });
+            
+            // API URL input change handler - check health when URL changes
+            apiUrlInput.addEventListener('change', function() {
+                checkApiHealth();
+            });
+            
+            // Function to check API health
+            function checkApiHealth() {
+                const API_BASE_URL = getApiBaseUrl();
+                showLoading(true);
+                hideError();
+                
+                fetch(`${API_BASE_URL}/health`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('API health check failed');
+                        }
+                        corsMessage.style.display = 'none';
+                        return response.json();
+                    })
+                    .then(data => {
+                        showLoading(false);
+                        if (data.status !== 'healthy') {
+                            showError('API is running but models failed to load. Some features may not work properly.');
+                        }
+                        // Enable buttons as API is working
+                        searchButton.disabled = false;
+                        getRecommendationsButton.disabled = false;
+                    })
+                    .catch(error => {
+                        showLoading(false);
+                        // Check if it's a CORS error
+                        if (error.message.includes('NetworkError') || 
+                            error.message.includes('Failed to fetch') ||
+                            error.message === 'API health check failed') {
+                            corsMessage.style.display = 'block';
+                            showError('Could not connect to the API. This might be due to a CORS issue or the server not running.');
+                        } else {
+                            showError('Could not connect to the API. Please check if the server is running.');
+                        }
+                        // Disable buttons as API is not working
+                        searchButton.disabled = true;
+                        getRecommendationsButton.disabled = true;
+                    });
+            }
+            
+            // Function to search for songs
+            function searchSongs(query) {
+                const API_BASE_URL = getApiBaseUrl();
+                showLoading(true);
+                hideError();
+                
+                fetch(`${API_BASE_URL}/search?query=${encodeURIComponent(query)}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Search failed');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        showLoading(false);
+                        displaySearchResults(data.results);
+                    })
+                    .catch(error => {
+                        showLoading(false);
+                        showError('Failed to search songs. Please try again later.');
+                        console.error('Error searching songs:', error);
+                    });
+            }
+            
+            // Function to display search results
+            function displaySearchResults(results) {
+                searchResults.innerHTML = '';
+                
+                if (results.length === 0) {
+                    searchResults.innerHTML = '<div class="result-item">No songs found</div>';
+                } else {
+                    results.forEach(song => {
+                        const resultItem = document.createElement('div');
+                        resultItem.className = 'result-item';
+                        resultItem.innerHTML = `
+                            <div class="song-title">${song.track_name}</div>
+                            <div class="song-artist">${song.artists}</div>
+                        `;
+                        resultItem.addEventListener('click', function() {
+                            trackIdInput.value = song.track_id;
+                            searchInput.value = song.track_name;
+                            getRecommendations(song.track_id);
+                            searchResults.style.display = 'none';
+                        });
+                        searchResults.appendChild(resultItem);
+                    });
+                }
+                
+                searchResults.style.display = 'block';
+            }
+            
+            // Function to get recommendations
+            function getRecommendations(trackId) {
+                const API_BASE_URL = getApiBaseUrl();
+                showLoading(true);
+                hideError();
+                
+                // Determine which API endpoint to use based on selected model
+                let endpoint = `${API_BASE_URL}/recommend?track_id=${encodeURIComponent(trackId)}&k=5`;
+                
+                // Append model parameter if it's available in your API
+                const model = recommendationModel.value;
+                if (model) {
+                    endpoint += `&model=${encodeURIComponent(model)}`;
+                }
+                
+                fetch(endpoint)
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.json().then(err => {
+                                throw new Error(err.error || 'Failed to get recommendations');
+                            });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        showLoading(false);
+                        displayRecommendations(data);
+                    })
+                    .catch(error => {
+                        showLoading(false);
+                        showError(error.message || 'Failed to get recommendations. Please try again later.');
+                        console.error('Error getting recommendations:', error);
+                    });
+            }
+            
+            // Function to display recommendations
+            function displayRecommendations(data) {
+                recommendationResults.innerHTML = '';
+                
+                // Display the original song first
+                const originalSong = document.createElement('div');
+                originalSong.className = 'song-card';
+                originalSong.innerHTML = `
+                    <div class="song-title">Original Song: ${data.track_name}</div>
+                    <div class="song-artist">Track ID: ${data.track_id}</div>
+                `;
+                recommendationResults.appendChild(originalSong);
+                
+                // Display recommended songs
+                if (data.recommendations.length === 0) {
+                    recommendationResults.innerHTML += '<div class="song-card">No recommendations found</div>';
+                } else {
+                    data.recommendations.forEach((song, index) => {
+                        const songCard = document.createElement('div');
+                        songCard.className = 'song-card';
+                        songCard.innerHTML = `
+                            <div class="song-title">${index + 1}. ${song.track_name}</div>
+                            <div class="song-artist">${song.artists}</div>
+                        `;
+                        recommendationResults.appendChild(songCard);
+                    });
+                }
+                
+                // Scroll to recommendations
+                document.getElementById('recommendations').scrollIntoView({ behavior: 'smooth' });
+            }
+            
+            // Show/hide loading indicator
+            function showLoading(show) {
+                loading.style.display = show ? 'block' : 'none';
+            }
+            
+            // Show error message
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+            }
+            
+            // Hide error message
+            function hideError() {
+                errorMessage.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

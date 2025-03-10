@@ -1,0 +1,22 @@
+version: '3'
+
+services:
+  backend:
+    build: ./music_recommendation
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./music_recommendation:/app
+    command: uvicorn app:app --host 0.0.0.0 --port 8000
+
+  frontend:
+    build: ./music_recommendation/recommendation
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./music_recommendation/recommendation:/app
+      - /app/node_modules
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+    depends_on:
+      - backend

@@ -1,0 +1,2 @@
+curl "http://localhost:8000/recommend?track_id=5SuOikwiRyPMVoIQDJUgSV"
+curl "http://localhost:8000/recommend?track_name=Comedy" 
